@@ -28,7 +28,7 @@ export class StudyResolver {
 
         const allStudies = await apiClient.getAllStudies();
 
-        const matches = allStudies.filter(study => {
+        const matches = allStudies.filter((study) => {
             const searchText = [
                 study.studyId,
                 study.name,
@@ -39,10 +39,10 @@ export class StudyResolver {
                 .join(' ')
                 .toLowerCase();
 
-            return keywords.some(kw => searchText.includes(kw.toLowerCase()));
+            return keywords.some((kw) => searchText.includes(kw.toLowerCase()));
         });
 
-        const results = matches.map(study => ({
+        const results = matches.map((study) => ({
             studyId: study.studyId,
             name: study.name,
             description: study.description,

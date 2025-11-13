@@ -16,24 +16,20 @@ cBioPortal Navigator bridges the gap between natural language cancer genomics qu
 - **Smart Study Resolution**: Search studies by keywords or validate study IDs
 - **Gene Validation**: Batch validate gene symbols against cBioPortal's database
 - **Ambiguity Handling**: Returns multiple options when queries match several entities
-- **Four MCP Tools**:
-  - `resolve_and_build_url` - Main intelligent tool for any cBioPortal query
-  - `build_study_url` - Generate study view URLs
-  - `build_patient_url` - Generate patient/sample view URLs
-  - `build_results_url` - Generate results/query view URLs
+- **Unified MCP Tool**: Single powerful `resolve_and_build_url` tool that handles:
+  - Study view URLs - Browse cancer study summaries
+  - Patient view URLs - View individual patient/sample data
+  - Results/Query URLs - Analyze gene alterations across cohorts
 
 ## Project Structure
 
 ```
 cbioportal-navigator/
 ├── src/
-│   ├── index.ts              # Entry point
-│   ├── server.ts             # MCP server setup and tool registration
-│   ├── tools/                # MCP tool definitions
-│   │   ├── resolveAndBuildUrl.ts    # Main intelligent tool
-│   │   ├── buildStudyUrl.ts
-│   │   ├── buildPatientUrl.ts
-│   │   └── buildResultsUrl.ts
+│   ├── index.ts              # Entry point (stdio/HTTP mode selection)
+│   ├── server.ts             # MCP server creation and tool registration
+│   ├── tools/
+│   │   └── resolveAndBuildUrl.ts    # Main tool: definition + handler
 │   ├── resolution/           # Entity resolvers
 │   │   ├── studyResolver.ts  # Study search and validation
 │   │   ├── geneResolver.ts   # Gene validation
@@ -100,10 +96,16 @@ Use this method to run the MCP server locally and connect it to Claude Desktop.
 
 #### Development Mode
 
-For development with auto-reload:
+For development with auto-reload (stdio mode):
 
 ```bash
 npm run dev
+```
+
+For HTTP mode development:
+
+```bash
+MCP_TRANSPORT=http PORT=8002 npm run dev
 ```
 
 ### Option 2: Server Deployment with LibreChat
@@ -165,7 +167,8 @@ Deploy as a containerized service for use with LibreChat or other MCP clients th
 6. **Verify deployment**:
 
    - LibreChat: http://localhost:3080
-   - MCP Server SSE endpoint: http://localhost:8002/sse
+   - MCP Server endpoint: http://localhost:8002/mcp
+   - Health check: http://localhost:8002/health
 
    Check logs:
    ```bash
@@ -181,12 +184,12 @@ version: 1.1.9
 
 mcpServers:
   cbioportal-navigator:
-    type: sse
-    url: "http://cbioportal-navigator:8002/sse"
+    type: streamable-http
+    url: "http://cbioportal-navigator:8002/mcp"
     description: "Navigate to cBioPortal pages by resolving natural language queries into URLs"
 ```
 
-This tells LibreChat to connect to the MCP server via Server-Sent Events (SSE) on port 8002.
+This tells LibreChat to connect to the MCP server via Streamable HTTP transport on port 8002.
 
 #### Using Pre-built Docker Images
 
@@ -211,8 +214,8 @@ When connected to an AI assistant:
 **Query**: "Show me TP53 mutations in TCGA lung adenocarcinoma"
 
 **What happens**:
-1. AI extracts: study keywords ["TCGA", "lung", "adenocarcinoma"], genes ["TP53"]
-2. Calls `resolve_and_build_url` tool
+1. AI extracts structured input: `targetPage="results"`, study keywords `["TCGA", "lung", "adenocarcinoma"]`, genes `["TP53"]`
+2. Calls `resolve_and_build_url` tool with extracted parameters
 3. Server searches studies → finds "luad_tcga"
 4. Validates gene "TP53" ✓
 5. Returns: `https://www.cbioportal.org/results/oncoprint?...`
@@ -220,9 +223,10 @@ When connected to an AI assistant:
 **Query**: "Take me to patient TCGA-05-4384 in study luad_tcga"
 
 **What happens**:
-1. AI calls `build_patient_url` with studyId="luad_tcga", patientId="TCGA-05-4384"
-2. Server validates study exists ✓
-3. Returns: `https://www.cbioportal.org/patient?studyId=luad_tcga&caseId=TCGA-05-4384`
+1. AI extracts: `targetPage="patient"`, `studyId="luad_tcga"`, `patientId="TCGA-05-4384"`
+2. Calls `resolve_and_build_url` tool
+3. Server validates study exists ✓
+4. Returns: `https://www.cbioportal.org/patient?studyId=luad_tcga&caseId=TCGA-05-4384`
 
 ## Architecture
 
@@ -239,9 +243,11 @@ cBioPortal Public API
 ### Transport Modes
 
 - **stdio**: For local clients like Claude Desktop (direct stdin/stdout communication)
-- **SSE**: For web-based clients like LibreChat (Server-Sent Events over HTTP)
+- **Streamable HTTP**: For remote/web-based clients like LibreChat (HTTP POST with optional SSE)
 
-The Docker image uses [Supergateway](https://github.com/modelcontextprotocol/server-supergateway) to bridge stdio to SSE.
+The server automatically selects the transport mode based on the `MCP_TRANSPORT` environment variable:
+- `MCP_TRANSPORT=stdio` (default): Uses stdio transport
+- `MCP_TRANSPORT=http`: Uses Streamable HTTP transport
 
 ## Development
 
@@ -295,11 +301,12 @@ docker-compose down
 docker-compose up --build
 ```
 
-### SSE endpoint not accessible
+### HTTP endpoint not accessible
 
 - Ensure port 8002 is not blocked by firewall
 - Verify container is running: `docker ps`
-- Test endpoint: `curl http://localhost:8002/sse`
+- Test health endpoint: `curl http://localhost:8002/health`
+- Test MCP endpoint: `curl -X POST http://localhost:8002/mcp -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"initialize"}'`
 
 ## Resources
 

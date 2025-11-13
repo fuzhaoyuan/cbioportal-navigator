@@ -56,7 +56,7 @@ export class ProfileResolver {
 
             // Find matching profile
             const profile = profiles.find(
-                p => p.molecularAlterationType === targetType
+                (p) => p.molecularAlterationType === targetType
             );
 
             if (!profile) {
@@ -94,7 +94,7 @@ export class ProfileResolver {
 
         try {
             const profiles = await apiClient.getMolecularProfiles(studyId);
-            const results = profiles.map(p => ({
+            const results = profiles.map((p) => ({
                 molecularProfileId: p.molecularProfileId,
                 molecularAlterationType: p.molecularAlterationType,
                 name: p.name,

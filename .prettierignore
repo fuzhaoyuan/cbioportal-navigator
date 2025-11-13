@@ -1,0 +1,11 @@
+dist
+node_modules
+*.log
+*.json
+*.md
+*.yml
+*.yaml
+package-lock.json
+.git
+.gitignore
+.prettierignore

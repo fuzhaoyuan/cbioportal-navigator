@@ -2,8 +2,7 @@
  * MCP Tool input/output type definitions
  */
 
-import { AlterationType } from '../resolution/index.js';
-import { ResolvedStudy } from '../resolution/studyResolver.js';
+import type { AlterationType } from '../resolution/profileResolver.js';
 
 export type TargetPage = 'study' | 'patient' | 'results';
 

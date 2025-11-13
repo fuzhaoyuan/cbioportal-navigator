@@ -12,7 +12,7 @@ export class CbioportalApiClient {
         const apiBaseUrl =
             baseUrl ||
             process.env.CBIOPORTAL_API_URL ||
-            'https://www.cbioportal.org/api';
+            'https://www.cbioportal.org';
         this.api = new CBioPortalAPI(apiBaseUrl);
     }
 

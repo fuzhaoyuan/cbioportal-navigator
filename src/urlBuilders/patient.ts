@@ -36,7 +36,7 @@ export function buildPatientUrl(options: PatientUrlOptions): string {
     let hash: string | undefined;
     if (navIds && navIds.length > 0) {
         hash = `navCaseIds=${navIds
-            .map(id => `${id.studyId}:${id.patientId}`)
+            .map((id) => `${id.studyId}:${id.patientId}`)
             .join(',')}`;
     }
 

@@ -3,24 +3,23 @@
  * Main tool that resolves parameters and builds cBioPortal URLs
  */
 
+import { z } from 'zod';
+import { studyResolver } from '../resolution/studyResolver.js';
+import { geneResolver } from '../resolution/geneResolver.js';
 import {
-    studyResolver,
-    geneResolver,
     profileResolver,
-} from '../resolution/index.js';
+    type AlterationType,
+} from '../resolution/profileResolver.js';
 import { buildStudyUrl } from '../urlBuilders/study.js';
 import { buildPatientUrl } from '../urlBuilders/patient.js';
 import { buildResultsUrl } from '../urlBuilders/results.js';
-import type {
-    ResolveAndBuildUrlInput,
-    ResolveAndBuildUrlResponse,
-    SuccessResponse,
-    ErrorResponse,
-    ClarificationResponse,
-} from '../types/mcp.js';
 
+/**
+ * Tool definition for MCP registration
+ */
 export const resolveAndBuildUrlTool = {
     name: 'resolve_and_build_url',
+    title: 'Resolve and Build cBioPortal URL',
     description: `Resolve parameters and build a cBioPortal URL from structured input.
 
 This is the main tool for generating cBioPortal URLs. It accepts structured parameters
@@ -33,155 +32,93 @@ extracted from user queries and:
 IMPORTANT: This tool expects structured input, not raw natural language.
 You should extract entities from the user's query first, then call this tool.
 
-Input Structure:
-{
-  "targetPage": "study" | "patient" | "results",
-  "parameters": {
-    // For study page:
-    "studyKeywords": ["TCGA", "lung"],      // Search keywords
-    "studyId": "luad_tcga",                 // Or direct study ID (skips search)
-
-    // For patient page:
-    "studyId": "luad_tcga",                 // Required
-    "patientId": "TCGA-001",                // Patient identifier
-
-    // For results page:
-    "studyKeywords": ["TCGA", "lung"],      // Search keywords OR
-    "studyId": "luad_tcga",                 // Direct study ID
-    "genes": ["TP53", "KRAS"],              // Gene symbols
-    "alterations": ["mutation"],            // Optional: mutation, cna, fusion, etc.
-    "caseSetId": "luad_tcga_all",           // Optional: will infer if missing
-
-    // Common:
-    "tab": "mutations"                      // Optional: specific tab to navigate to
-  }
-}
-
-Response Types:
-
-1. Success:
-{
-  "success": true,
-  "url": "https://www.cbioportal.org/...",
-  "metadata": { ... }
-}
-
-2. Ambiguity (multiple matches):
-{
-  "success": false,
-  "needsSelection": true,
-  "message": "Multiple studies found. Please specify:",
-  "options": [
-    { "studyId": "...", "name": "...", "sampleCount": 123 },
-    ...
-  ]
-}
-
-3. Error:
-{
-  "success": false,
-  "error": "Error message",
-  "details": { ... }
-}
+Response Format:
+- Success: { "success": true, "url": "...", "metadata": {...} }
+- Ambiguity: { "success": false, "needsSelection": true, "message": "...", "options": [...] }
+- Error: { "success": false, "error": "...", "details": {...} }
 
 Examples:
 
 1. Results page with keywords:
-Input: {
-  "targetPage": "results",
-  "parameters": {
-    "studyKeywords": ["TCGA", "lung", "adenocarcinoma"],
-    "genes": ["TP53"],
-    "alterations": ["mutation"]
-  }
-}
+   { "targetPage": "results", "parameters": { "studyKeywords": ["TCGA", "lung"], "genes": ["TP53"] } }
 
-2. Results page with direct study ID:
-Input: {
-  "targetPage": "results",
-  "parameters": {
-    "studyId": "luad_tcga",
-    "genes": ["TP53", "KRAS"]
-  }
-}
+2. Study view:
+   { "targetPage": "study", "parameters": { "studyId": "luad_tcga" } }
 
-3. Study view:
-Input: {
-  "targetPage": "study",
-  "parameters": {
-    "studyId": "luad_tcga"
-  }
-}`,
+3. Patient view:
+   { "targetPage": "patient", "parameters": { "studyId": "luad_tcga", "patientId": "TCGA-001" } }`,
     inputSchema: {
-        type: 'object',
-        properties: {
-            targetPage: {
-                type: 'string',
-                enum: ['study', 'patient', 'results'],
-                description: 'The type of cBioPortal page to navigate to',
-            },
-            parameters: {
-                type: 'object',
-                properties: {
-                    studyKeywords: {
-                        type: 'array',
-                        items: { type: 'string' },
-                        description:
-                            'Keywords to search for studies (e.g., ["TCGA", "lung"])',
-                    },
-                    studyId: {
-                        type: 'string',
-                        description: 'Direct study ID (skips search if provided)',
-                    },
-                    patientId: {
-                        type: 'string',
-                        description: 'Patient/case identifier',
-                    },
-                    sampleId: {
-                        type: 'string',
-                        description: 'Sample identifier',
-                    },
-                    genes: {
-                        type: 'array',
-                        items: { type: 'string' },
-                        description: 'Gene symbols (e.g., ["TP53", "KRAS"])',
-                    },
-                    alterations: {
-                        type: 'array',
-                        items: { type: 'string' },
-                        description:
-                            'Alteration types: mutation, cna, fusion, mrna, protein',
-                    },
-                    caseSetId: {
-                        type: 'string',
-                        description:
-                            'Case set ID (optional, will be inferred if not provided)',
-                    },
-                    tab: {
-                        type: 'string',
-                        description: 'Specific tab to navigate to',
-                    },
-                    filters: {
-                        type: 'object',
-                        description: 'Additional filters',
-                    },
-                },
-            },
-        },
-        required: ['targetPage', 'parameters'],
+        targetPage: z
+            .enum(['study', 'patient', 'results'])
+            .describe('The type of cBioPortal page to navigate to'),
+        parameters: z
+            .object({
+                studyKeywords: z
+                    .array(z.string())
+                    .optional()
+                    .describe(
+                        'Keywords to search for studies (e.g., ["TCGA", "lung"])'
+                    ),
+                studyId: z
+                    .string()
+                    .optional()
+                    .describe('Direct study ID (skips search if provided)'),
+                patientId: z
+                    .string()
+                    .optional()
+                    .describe('Patient/case identifier'),
+                sampleId: z.string().optional().describe('Sample identifier'),
+                genes: z
+                    .array(z.string())
+                    .optional()
+                    .describe('Gene symbols (e.g., ["TP53", "KRAS"])'),
+                alterations: z
+                    .array(z.string())
+                    .optional()
+                    .describe(
+                        'Alteration types: mutation, cna, fusion, mrna, protein'
+                    ),
+                caseSetId: z
+                    .string()
+                    .optional()
+                    .describe(
+                        'Case set ID (optional, will be inferred if not provided)'
+                    ),
+                tab: z
+                    .string()
+                    .optional()
+                    .describe('Specific tab to navigate to'),
+                filters: z
+                    .record(z.any())
+                    .optional()
+                    .describe('Additional filters'),
+            })
+            .describe('Parameters for URL building'),
     },
 };
 
-export async function handleResolveAndBuildUrl(
-    input: ResolveAndBuildUrlInput
-): Promise<string> {
+// Infer type from Zod schema
+type ToolInput = {
+    targetPage: z.infer<typeof resolveAndBuildUrlTool.inputSchema.targetPage>;
+    parameters: z.infer<typeof resolveAndBuildUrlTool.inputSchema.parameters>;
+};
+
+/**
+ * Tool handler for MCP
+ */
+export async function handleResolveAndBuildUrl(input: ToolInput) {
     try {
         const result = await resolveAndBuildUrl(input);
-
-        // Format response as JSON string
-        return JSON.stringify(result, null, 2);
+        return {
+            content: [
+                {
+                    type: 'text' as const,
+                    text: JSON.stringify(result, null, 2),
+                },
+            ],
+        };
     } catch (error) {
-        const errorResponse: ErrorResponse = {
+        const errorResponse = {
             success: false,
             error:
                 error instanceof Error
@@ -189,13 +126,21 @@ export async function handleResolveAndBuildUrl(
                     : 'Unknown error occurred',
             details: error,
         };
-        return JSON.stringify(errorResponse, null, 2);
+        return {
+            content: [
+                {
+                    type: 'text' as const,
+                    text: JSON.stringify(errorResponse, null, 2),
+                },
+            ],
+        };
     }
 }
 
-async function resolveAndBuildUrl(
-    input: ResolveAndBuildUrlInput
-): Promise<ResolveAndBuildUrlResponse> {
+/**
+ * Main resolution logic
+ */
+async function resolveAndBuildUrl(input: ToolInput) {
     const { targetPage, parameters } = input;
 
     switch (targetPage) {
@@ -213,9 +158,7 @@ async function resolveAndBuildUrl(
 /**
  * Handle Study View page
  */
-async function handleStudyPage(
-    params: ResolveAndBuildUrlInput['parameters']
-): Promise<ResolveAndBuildUrlResponse> {
+async function handleStudyPage(params: ToolInput['parameters']) {
     let studyId: string;
 
     // Resolve study ID
@@ -247,7 +190,7 @@ async function handleStudyPage(
                 success: false,
                 needsSelection: true,
                 message: 'Multiple studies found. Please specify which one:',
-                options: matches.map(s => ({
+                options: matches.map((s) => ({
                     studyId: s.studyId,
                     name: s.name,
                     description: s.description,
@@ -287,9 +230,7 @@ async function handleStudyPage(
 /**
  * Handle Patient View page
  */
-async function handlePatientPage(
-    params: ResolveAndBuildUrlInput['parameters']
-): Promise<ResolveAndBuildUrlResponse> {
+async function handlePatientPage(params: ToolInput['parameters']) {
     if (!params.studyId) {
         return {
             success: false,
@@ -335,9 +276,7 @@ async function handlePatientPage(
 /**
  * Handle Results/Query page
  */
-async function handleResultsPage(
-    params: ResolveAndBuildUrlInput['parameters']
-): Promise<ResolveAndBuildUrlResponse> {
+async function handleResultsPage(params: ToolInput['parameters']) {
     let studyId: string;
 
     // 1. Resolve study ID
@@ -366,7 +305,7 @@ async function handleResultsPage(
                 success: false,
                 needsSelection: true,
                 message: 'Multiple studies found. Please specify which one:',
-                options: matches.map(s => ({
+                options: matches.map((s) => ({
                     studyId: s.studyId,
                     name: s.name,
                     description: s.description,
@@ -402,12 +341,17 @@ async function handleResultsPage(
     }
 
     if (validGenes.length < params.genes.length) {
-        const invalidGenes = params.genes.filter(g => !validGenes.includes(g));
-        console.warn(`Some genes were invalid and skipped: ${invalidGenes.join(', ')}`);
+        const invalidGenes = params.genes.filter(
+            (g) => !validGenes.includes(g)
+        );
+        console.warn(
+            `Some genes were invalid and skipped: ${invalidGenes.join(', ')}`
+        );
     }
 
     // 3. Get molecular profile (optional, for metadata)
-    const alterationType = params.alterations?.[0] || 'mutation';
+    const alterationType =
+        (params.alterations?.[0] as AlterationType) || 'mutation';
     const profile = await profileResolver.getForStudy(studyId, alterationType);
 
     // 4. Determine case set ID

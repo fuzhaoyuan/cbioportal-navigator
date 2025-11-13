@@ -35,7 +35,7 @@ export class GeneResolver {
      */
     async validateBatch(geneSymbols: string[]): Promise<string[]> {
         const results = await Promise.all(
-            geneSymbols.map(async gene => {
+            geneSymbols.map(async (gene) => {
                 const normalized = gene.toUpperCase();
                 const isValid = await this.validate(normalized);
                 return isValid ? normalized : null;

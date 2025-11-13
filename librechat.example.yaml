@@ -6,8 +6,8 @@ version: 1.1.9
 # MCP Server Configuration
 mcpServers:
   cbioportal-navigator:
-    type: sse
-    url: "http://cbioportal-navigator:8002/sse"
+    type: streamable-http
+    url: "http://cbioportal-navigator:8002/mcp"
     description: "Navigate to cBioPortal pages by resolving natural language queries into URLs"
 
 # Optional: Configure your AI providers
