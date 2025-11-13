@@ -1,0 +1,24 @@
+# LibreChat Configuration Example
+# Copy this file to librechat.yaml and configure as needed
+
+version: 1.1.9
+
+# MCP Server Configuration
+mcpServers:
+  cbioportal-navigator:
+    type: sse
+    url: "http://cbioportal-navigator:8002/sse"
+    description: "Navigate to cBioPortal pages by resolving natural language queries into URLs"
+
+# Optional: Configure your AI providers
+# endpoints:
+#   anthropic:
+#     apiKey: "${ANTHROPIC_API_KEY}"
+#     models:
+#       default:
+#         - "claude-3-5-sonnet-20241022"
+#   openai:
+#     apiKey: "${OPENAI_API_KEY}"
+#     models:
+#       default:
+#         - "gpt-4"

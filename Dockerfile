@@ -20,6 +20,9 @@ FROM node:18-alpine
 
 WORKDIR /app
 
+# Install Supergateway globally for LibreChat compatibility
+RUN npm install -g @modelcontextprotocol/server-supergateway
+
 # Copy package files
 COPY package.json package-lock.json ./
 
@@ -32,7 +35,9 @@ COPY --from=builder /app/dist ./dist
 # Set environment to production
 ENV NODE_ENV=production
 
-# MCP servers are typically invoked by the client (LibreChat)
-# rather than running as standalone services.
-# This entrypoint allows the container to be used as a command.
-ENTRYPOINT ["node", "dist/index.js"]
+# Expose SSE port for LibreChat
+EXPOSE 8002
+
+# Use Supergateway to bridge stdio to SSE for LibreChat
+# For direct stdio use (Claude Desktop), override with: docker run --entrypoint node image dist/index.js
+ENTRYPOINT ["npx", "supergateway", "--stdio", "node", "dist/index.js", "--port", "8002"]

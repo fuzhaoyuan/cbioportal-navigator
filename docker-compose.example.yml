@@ -7,33 +7,39 @@ services:
     container_name: librechat
     ports:
       - "3080:3080"
-    environment:
-      - MCP_SERVERS=cbioportal-navigator
-      # Add other LibreChat environment variables here
     volumes:
-      - ./librechat-data:/app/client/public
-      # Mount the MCP server configuration
-      - ./mcp-config.json:/app/mcp-config.json
+      - librechat-data:/app/client/public
+      # Mount LibreChat configuration with MCP server settings
+      - ./librechat.yaml:/app/librechat.yaml
     depends_on:
       - cbioportal-navigator
     networks:
       - librechat-network
+    environment:
+      # Add your LibreChat environment variables here
+      - HOST=0.0.0.0
+      - PORT=3080
+      # Add API keys and other required env vars
 
   # cBioPortal Navigator MCP Server
   cbioportal-navigator:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    # Or use pre-built image:
-    # image: ghcr.io/YOUR_USERNAME/cbioportal-navigator:latest
+    # Use pre-built image from GitHub Container Registry
+    image: ghcr.io/YOUR_USERNAME/cbioportal-navigator:latest
+    # Or build locally:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
     container_name: cbioportal-navigator
-    # MCP servers communicate via stdio, not network ports
-    # They are invoked by the client (LibreChat) when needed
+    ports:
+      - "8002:8002"  # SSE port for LibreChat communication
     networks:
       - librechat-network
-    # Optional: if your MCP server needs environment variables
-    # environment:
-    #   - CBIOPORTAL_URL=https://www.cbioportal.org
+    environment:
+      - CBIOPORTAL_BASE_URL=https://www.cbioportal.org
+    restart: unless-stopped
+
+volumes:
+  librechat-data:
 
 networks:
   librechat-network:
